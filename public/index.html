@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Transcription App</title>
+    <!-- <script src="/socket.io/socket.io.js"></script> -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.2em;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .record-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a5a);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
+        }
+
+        .record-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        .record-btn:active {
+            transform: translateY(0);
+        }
+
+        .record-btn.recording {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 5px 15px rgba(78, 205, 196, 0.3); }
+            50% { box-shadow: 0 5px 25px rgba(78, 205, 196, 0.6); }
+            100% { box-shadow: 0 5px 15px rgba(78, 205, 196, 0.3); }
+        }
+
+        .upload-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .status {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .status.listening {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 2px solid #4caf50;
+        }
+
+        .status.processing {
+            background: #fff3e0;
+            color: #ef6c00;
+            border: 2px solid #ff9800;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 2px solid #f44336;
+        }
+
+        .transcription-area {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 30px;
+            min-height: 200px;
+            margin-bottom: 20px;
+        }
+
+        .transcription-title {
+            color: #495057;
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .transcription-title::before {
+            content: "🎤";
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+
+        .transcription-text {
+            color: #212529;
+            font-size: 1.1em;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .language-support {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .language-support h3 {
+            color: #495057;
+            margin-bottom: 10px;
+        }
+
+        .language-flags {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .language-flag {
+            padding: 8px 15px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .record-btn, .upload-btn {
+                width: 100%;
+                max-width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎙️ Voice Transcription</h1>
+            <p>Real-time speech-to-text with multi-language support</p>
+        </div>
+
+        <div class="controls">
+            <button id="recordBtn" class="record-btn">🎤 Start Recording</button>
+            <label for="audioFile" class="upload-btn">📁 Upload Audio File</label>
+            <input type="file" id="audioFile" class="file-input" accept="audio/*">
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+
+        <div class="transcription-area">
+            <div class="transcription-title">Transcription Results</div>
+            <div id="transcriptionText" class="transcription-text">
+                Click "Start Recording" to begin voice transcription or upload an audio file...
+            </div>
+        </div>
+
+        <div class="language-support">
+            <h3>🌍 Supported Languages</h3>
+            <div class="language-flags">
+                <span class="language-flag">🇺🇸 English</span>
+                <span class="language-flag">🇨🇳 Chinese</span>
+                <span class="language-flag">🇯🇵 Japanese</span>
+                <span class="language-flag">🇹🇼 Taiwanese</span>
+                <span class="language-flag">+ 50 more languages</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // const socket = io();
+        // When io() is called without a URL, it connects to the server that served the page.
+        // This is the best practice as it avoids hardcoding URLs.
+        const socket = io({ transports: ['websocket', 'polling'] });
+
+        const recordBtn = document.getElementById('recordBtn');
+        const audioFileInput = document.getElementById('audioFile');
+        const statusDiv = document.getElementById('status');
+        const transcriptionText = document.getElementById('transcriptionText');
+
+        let mediaRecorder;
+        let isRecording = false;
+        let audioChunks = [];
+
+        // Initialize recording functionality
+        recordBtn.addEventListener('click', toggleRecording);
+        audioFileInput.addEventListener('change', handleFileUpload);
+
+        async function toggleRecording() {
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        sendAudioForTranscription(audioBlob);
+                        audioChunks = [];
+                    };
+
+                    mediaRecorder.start();
+                    startRecording();
+                } catch (error) {
+                    showStatus('error', 'Microphone access denied or not available');
+                    console.error('Error accessing microphone:', error);
+                }
+            } else {
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            isRecording = true;
+            recordBtn.textContent = '🛑 Stop Recording';
+            recordBtn.classList.add('recording');
+            showStatus('listening', '🎤 Listening... Click "Stop Recording" when finished');
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            recordBtn.textContent = '🎤 Start Recording';
+            recordBtn.classList.remove('recording');
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            showStatus('processing', '⏳ Processing audio...');
+        }
+
+        async function handleFileUpload() {
+            const file = audioFileInput.files[0];
+            if (file) {
+                showStatus('processing', '⏳ Processing uploaded file...');
+                sendAudioForTranscription(file);
+            }
+        }
+
+        async function sendAudioForTranscription(audioBlob) {
+            try {
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'audio.wav');
+
+                const response = await fetch('/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    displayTranscription(result.transcription);
+                    hideStatus();
+                } else {
+                    showStatus('error', '❌ ' + (result.error || 'Transcription failed'));
+                }
+            } catch (error) {
+                console.error('Transcription error:', error);
+                showStatus('error', '❌ Network error occurred');
+            }
+        }
+
+        function displayTranscription(text) {
+            if (text && text.trim()) {
+                transcriptionText.textContent = text;
+            } else {
+                transcriptionText.textContent = 'No speech detected in the audio.';
+            }
+        }
+
+        function showStatus(type, message) {
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+
+        function hideStatus() {
+            statusDiv.style.display = 'none';
+        }
+
+        // Socket.IO event listeners
+        socket.on('transcription', (data) => {
+            displayTranscription(data.text);
+            hideStatus();
+        });
+
+        socket.on('transcription-error', (data) => {
+            showStatus('error', '❌ ' + data.error);
+        });
+
+        // Real-time streaming (alternative implementation)
+        function startStreamingRecognition() {
+            // This would be used for real-time streaming transcription
+            // Currently using the batch upload method above
+        }
+
+        // Check if browser supports required features
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showStatus('error', '❌ Your browser does not support audio recording');
+            recordBtn.disabled = true;
+        }
+    </script>
+</body>
+</html>

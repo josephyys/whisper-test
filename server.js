@@ -89,7 +89,7 @@ async function transcribeWithWhisper(audioPath) {
       '--model', 'base',
       '--output_format', 'txt',
       '--output_dir', 'temp',
-      '--language', 'auto' // Auto-detect language (supports English, Chinese, Japanese, etc.)
+    //   '--language', 'auto' // Auto-detect language (supports English, Chinese, Japanese, etc.)
     ]);
 
     let output = '';
